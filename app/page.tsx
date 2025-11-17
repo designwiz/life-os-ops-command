@@ -31,20 +31,9 @@ export default function HomePage() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [todayTaskCount, setTodayTaskCount] = useState<number>(0);
   const [openOrdersCount, setOpenOrdersCount] = useState<number>(0);
+  const [activeRemindersCount, setActiveRemindersCount] = useState<number>(0);
 
-  // Register service worker for PWA
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker
-        .register("/sw.js")
-        .catch((err) => console.error("Service worker registration failed", err));
-    }
-  }, []);
-
-  
-  
-  // Load "today", history, tasks count, orders count
+  // Load "today", history, tasks count, orders count, reminders count
   useEffect(() => {
     try {
       if (typeof window === "undefined") return;
@@ -82,6 +71,16 @@ export default function HomePage() {
         const open = parsed.filter((o) => o.status !== "Completed").length;
         setOpenOrdersCount(open);
       }
+
+      // Reminders – count active (not completed)
+      const savedReminders = window.localStorage.getItem("lifeOS_reminders");
+      if (savedReminders) {
+        const parsed = JSON.parse(savedReminders) as {
+          completed?: boolean;
+        }[];
+        const active = parsed.filter((r) => !r.completed).length;
+        setActiveRemindersCount(active);
+      }
     } catch (err) {
       console.error("Failed to load saved state", err);
     }
@@ -97,6 +96,18 @@ export default function HomePage() {
       console.error("Failed to save today state", err);
     }
   }, [today]);
+
+  // Register service worker for PWA
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker
+        .register("/sw.js")
+        .catch((err) =>
+          console.error("Service worker registration failed", err)
+        );
+    }
+  }, []);
 
   const updateField = (field: keyof TodayState, value: string | boolean) => {
     setToday((prev) => ({
@@ -362,6 +373,15 @@ export default function HomePage() {
             <span>Orders</span>
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-900/70 border border-amber-500">
               Open: {openOrdersCount}
+            </span>
+          </a>
+          <a
+            href="/reminders"
+            className="flex items-center gap-2 px-3 py-1 rounded-full border border-sky-500 text-sky-300 hover:bg-sky-500/10 transition"
+          >
+            <span>Reminders</span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-900/70 border border-sky-500">
+              Active: {activeRemindersCount}
             </span>
           </a>
           <a
