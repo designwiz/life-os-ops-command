@@ -32,6 +32,8 @@ export default function HomePage() {
   const [todayTaskCount, setTodayTaskCount] = useState<number>(0);
   const [openOrdersCount, setOpenOrdersCount] = useState<number>(0);
   const [activeRemindersCount, setActiveRemindersCount] = useState<number>(0);
+  const [profileName, setProfileName] = useState<string>("");
+
 
   // Load "today", history, tasks count, orders count, reminders count
   useEffect(() => {
@@ -96,6 +98,25 @@ export default function HomePage() {
       console.error("Failed to save today state", err);
     }
   }, [today]);
+
+  // Load current profile name
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const saved = window.localStorage.getItem("lifeOS_currentProfile");
+      if (saved) {
+        const parsed = JSON.parse(saved) as { name?: string };
+        if (parsed.name) {
+          setProfileName(parsed.name);
+          return;
+        }
+      }
+      // Fallback if no profile yet
+      setProfileName("Guest");
+    } catch {
+      setProfileName("Guest");
+    }
+  }, []);
 
   // Register service worker for PWA
   useEffect(() => {
@@ -328,7 +349,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 p-4 md:p-8">
-      <header className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+         <header className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold">
             Will&apos;s Ops Command
@@ -336,8 +357,22 @@ export default function HomePage() {
           <p className="text-sm text-zinc-400">
             Daily Life Ops • {today.date || "Set date below"}
           </p>
+          <p className="mt-1 text-xs text-zinc-500">
+            Profile:{" "}
+            <span className="text-zinc-100 font-semibold">
+              {profileName || "Guest"}
+            </span>{" "}
+            ·{" "}
+            <a
+              href="/login"
+              className="underline-offset-2 underline text-sky-400 hover:text-sky-300"
+            >
+              switch / manage profiles
+            </a>
+          </p>
         </div>
         <div className="flex flex-wrap gap-2 text-xs text-zinc-400 items-center">
+
           <span className="px-2 py-1 rounded-full bg-emerald-900/40 border border-emerald-600/60">
             STATUS: GREEN
           </span>
