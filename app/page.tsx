@@ -16,6 +16,25 @@ type HistoryEntry = TodayState & {
   savedAt?: string;
 };
 
+type MiniReminder = {
+  id: string;
+  title: string;
+  dueDate: string;
+  assignedTo?: string;
+  isOverdue: boolean;
+  isToday: boolean;
+};
+
+type MiniTask = {
+  id: string;
+  title: string;
+  dueDate: string;
+  assignedTo?: string;
+  priority?: string;
+  isOverdue: boolean;
+  isToday: boolean;
+};
+
 const INITIAL_STATE: TodayState = {
   date: "",
   weightKg: "",
@@ -34,17 +53,22 @@ export default function HomePage() {
   const [activeRemindersCount, setActiveRemindersCount] =
     useState<number>(0);
   const [profileName, setProfileName] = useState<string>("Guest");
+  const [miniReminders, setMiniReminders] = useState<MiniReminder[]>([]);
+  const [miniTasks, setMiniTasks] = useState<MiniTask[]>([]);
 
-  // Michelle mode = change behaviour / visibility
+  // Michelle mode = hide health cards
   const michelleMode =
     profileName.trim().toLowerCase() === "michelle";
 
-  // Load "today", history, counts, and profile (all shared data)
+  // Load "today", history, counts, tasks, and mini reminders
   useEffect(() => {
     try {
       if (typeof window === "undefined") return;
 
+      const todayStr = new Date().toISOString().slice(0, 10);
+
       // ---- Profile ----
+      let currentProfileName = "Guest";
       try {
         const savedProfile = window.localStorage.getItem(
           "lifeOS_currentProfile"
@@ -54,16 +78,16 @@ export default function HomePage() {
             name?: string;
           };
           if (parsed.name) {
-            setProfileName(parsed.name);
-          } else {
-            setProfileName("Guest");
+            currentProfileName = parsed.name;
           }
-        } else {
-          setProfileName("Guest");
         }
       } catch {
-        setProfileName("Guest");
+        currentProfileName = "Guest";
       }
+      setProfileName(currentProfileName);
+      const profileLower = currentProfileName
+        .trim()
+        .toLowerCase();
 
       // ---- Today (shared/global) ----
       const savedToday = window.localStorage.getItem("lifeOS_today");
@@ -85,16 +109,63 @@ export default function HomePage() {
         setHistory(parsed);
       }
 
-      // ---- Tasks – use shared key ----
+      // ---- Tasks – Today count + mini tasks ----
       const savedTasks = window.localStorage.getItem("lifeOS_tasks");
       if (savedTasks) {
-        const parsed = JSON.parse(savedTasks) as { status?: string }[];
-        const count = parsed.filter(
+        const parsed = JSON.parse(savedTasks) as {
+          id?: string;
+          title?: string;
+          status?: string;
+          assignedTo?: string;
+          priority?: string;
+          dueDate?: string;
+        }[];
+
+        const todayTasksAll = parsed.filter(
           (t) => t.status === "Today"
-        ).length;
-        setTodayTaskCount(count);
+        );
+        setTodayTaskCount(todayTasksAll.length);
+
+        const mineTodayRaw = todayTasksAll.filter((t) => {
+          const assigned = (t.assignedTo || "")
+            .trim()
+            .toLowerCase();
+          if (profileLower === "will" || profileLower === "michelle") {
+            // Show tasks assigned to me or unassigned
+            return assigned === profileLower || !assigned;
+          }
+          // Guest / other: show all
+          return true;
+        });
+
+        const mineTodayDue = mineTodayRaw.filter((t) => {
+          if (!t.dueDate) return true; // no due date, still show as today's task
+          return t.dueDate <= todayStr; // today or overdue
+        });
+
+        mineTodayDue.sort((a, b) => {
+          const ad = a.dueDate || "";
+          const bd = b.dueDate || "";
+          if (ad === bd) return 0;
+          return ad < bd ? -1 : 1;
+        });
+
+        const miniT: MiniTask[] = mineTodayDue.slice(0, 4).map((t) => ({
+          id:
+            t.id ||
+            `${Math.random().toString(16).slice(2)}-${Date.now()}`,
+          title: t.title || "",
+          dueDate: t.dueDate || "",
+          assignedTo: t.assignedTo,
+          priority: t.priority,
+          isOverdue: !!t.dueDate && t.dueDate < todayStr,
+          isToday: t.dueDate === todayStr,
+        }));
+
+        setMiniTasks(miniT);
       } else {
         setTodayTaskCount(0);
+        setMiniTasks([]);
       }
 
       // ---- Orders – shared key ----
@@ -109,18 +180,58 @@ export default function HomePage() {
         setOpenOrdersCount(0);
       }
 
-      // ---- Reminders – shared key ----
+      // ---- Reminders – shared key + mini reminders ----
       const savedReminders = window.localStorage.getItem(
         "lifeOS_reminders"
       );
       if (savedReminders) {
         const parsed = JSON.parse(savedReminders) as {
+          id?: string;
+          title?: string;
+          dueDate?: string;
           completed?: boolean;
+          assignedTo?: string;
         }[];
-        const active = parsed.filter((r) => !r.completed).length;
-        setActiveRemindersCount(active);
+
+        const active = parsed.filter((r) => !r.completed);
+        setActiveRemindersCount(active.length);
+
+        const mine = active.filter((r) => {
+          const assigned = (r.assignedTo || "")
+            .trim()
+            .toLowerCase();
+          const isMine =
+            profileLower === "will" || profileLower === "michelle"
+              ? assigned === profileLower || !assigned
+              : true; // if Guest or other, show all
+          const hasDue = !!r.dueDate;
+          const isDue =
+            hasDue && r.dueDate! <= todayStr; // today or overdue
+          return isMine && isDue;
+        });
+
+        mine.sort((a, b) => {
+          const ad = a.dueDate || "";
+          const bd = b.dueDate || "";
+          if (ad === bd) return 0;
+          return ad < bd ? -1 : 1;
+        });
+
+        const mini: MiniReminder[] = mine.slice(0, 4).map((r) => ({
+          id:
+            r.id ||
+            `${Math.random().toString(16).slice(2)}-${Date.now()}`,
+          title: r.title || "",
+          dueDate: r.dueDate || "",
+          assignedTo: r.assignedTo,
+          isOverdue: !!r.dueDate && r.dueDate < todayStr,
+          isToday: r.dueDate === todayStr,
+        }));
+
+        setMiniReminders(mini);
       } else {
         setActiveRemindersCount(0);
+        setMiniReminders([]);
       }
     } catch (err) {
       console.error("Failed to load saved state", err);
@@ -380,6 +491,18 @@ export default function HomePage() {
     };
   })();
 
+  // ---- PRIORITY BADGE HELPER ----
+
+  const priorityClasses = (priority?: string) => {
+    if (priority === "High") {
+      return "border-red-500 text-red-300 bg-red-900/40";
+    }
+    if (priority === "Low") {
+      return "border-zinc-500 text-zinc-300 bg-zinc-900";
+    }
+    return "border-amber-500 text-amber-300 bg-amber-900/40";
+  };
+
   // ---- RENDER ----
 
   return (
@@ -406,7 +529,7 @@ export default function HomePage() {
             </a>
           </p>
           {michelleMode && (
-            <p className="mt-1 text-[11px] text-pink-400">
+            <p className="mt-1 text-[11px] text-pink-300">
               Michelle mode: health stats hidden on this view 💕
             </p>
           )}
@@ -416,7 +539,7 @@ export default function HomePage() {
             STATUS: GREEN
           </span>
           <span className="px-2 py-1 rounded-full bg-zinc-900 border border-zinc-700">
-            Theme: Tactical / Shared Ops
+            Shared Ops Dashboard
           </span>
           <span
             className={
@@ -481,7 +604,7 @@ export default function HomePage() {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setToday(INITIAL_STATE)}
-            className="text-xs px-3 py-1 rounded-full border border-zinc-700 bg-zinc-900 hover	bg-zinc-800 transition"
+            className="text-xs px-3 py-1 rounded-full border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 transition"
           >
             Reset today
           </button>
@@ -715,7 +838,7 @@ export default function HomePage() {
               Today&apos;s Ops
             </h2>
             <span className="text-xs text-zinc-500">
-              {openTasks.length} open tasks
+              {openTasks.length} core tasks
             </span>
           </div>
           <ul className="space-y-2 text-sm">
@@ -738,6 +861,137 @@ export default function HomePage() {
           </ul>
         </section>
       </div>
+
+      {/* Mini Tasks + Mini Reminders */}
+      {(miniTasks.length > 0 || miniReminders.length > 0) && (
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          {miniTasks.length > 0 && (
+            <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 text-xs">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-zinc-300">
+                  Today&apos;s tasks
+                  {profileName &&
+                    profileName !== "Guest" &&
+                    ` for ${profileName}`}
+                </h2>
+                <a
+                  href="/tasks"
+                  className="text-[11px] text-purple-400 hover:text-purple-300 underline underline-offset-2"
+                >
+                  Open full task board
+                </a>
+              </div>
+              <ul className="space-y-2">
+                {miniTasks.map((t) => (
+                  <li
+                    key={t.id}
+                    className="flex items-start justify-between gap-2 rounded-xl border border-zinc-700 bg-zinc-800/80 p-2"
+                  >
+                    <div>
+                      <p className="text-zinc-100 text-xs">
+                        {t.title}
+                      </p>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {t.dueDate && (
+                          <span
+                            className={
+                              "px-2 py-0.5 rounded-full border text-[10px] " +
+                              (t.isOverdue
+                                ? "border-red-500 text-red-300 bg-red-900/40"
+                                : t.isToday
+                                ? "border-amber-500 text-amber-300 bg-amber-900/40"
+                                : "border-zinc-600 text-zinc-300 bg-zinc-900")
+                            }
+                          >
+                            {t.isOverdue
+                              ? `Overdue · ${t.dueDate}`
+                              : t.isToday
+                              ? "Due today"
+                              : `Due · ${t.dueDate}`}
+                          </span>
+                        )}
+                        {t.priority && (
+                          <span
+                            className={
+                              "px-2 py-0.5 rounded-full border text-[10px] " +
+                              priorityClasses(t.priority)
+                            }
+                          >
+                            {t.priority} priority
+                          </span>
+                        )}
+                        {t.assignedTo && (
+                          <span className="px-2 py-0.5 rounded-full border border-sky-500 text-sky-300 text-[10px]">
+                            {t.assignedTo}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {miniReminders.length > 0 && (
+            <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 text-xs">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-zinc-300">
+                  Today&apos;s reminders
+                  {profileName &&
+                    profileName !== "Guest" &&
+                    ` for ${profileName}`}
+                </h2>
+                <a
+                  href="/reminders"
+                  className="text-[11px] text-sky-400 hover:text-sky-300 underline underline-offset-2"
+                >
+                  Open full reminders
+                </a>
+              </div>
+              <ul className="space-y-2">
+                {miniReminders.map((r) => (
+                  <li
+                    key={r.id}
+                    className="flex items-start justify-between gap-2 rounded-xl border border-zinc-700 bg-zinc-800/80 p-2"
+                  >
+                    <div>
+                      <p className="text-zinc-100 text-xs">
+                        {r.title}
+                      </p>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {r.dueDate && (
+                          <span
+                            className={
+                              "px-2 py-0.5 rounded-full border text-[10px] " +
+                              (r.isOverdue
+                                ? "border-red-500 text-red-300 bg-red-900/40"
+                                : r.isToday
+                                ? "border-amber-500 text-amber-300 bg-amber-900/40"
+                                : "border-zinc-600 text-zinc-300 bg-zinc-900")
+                            }
+                          >
+                            {r.isOverdue
+                              ? `Overdue · ${r.dueDate}`
+                              : r.isToday
+                              ? "Due today"
+                              : `Due · ${r.dueDate}`}
+                          </span>
+                        )}
+                        {r.assignedTo && (
+                          <span className="px-2 py-0.5 rounded-full border border-sky-500 text-sky-300 text-[10px]">
+                            {r.assignedTo}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </div>
+      )}
 
       {/* Message of the Day */}
       <div className="mt-6 grid">
