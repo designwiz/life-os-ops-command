@@ -8,36 +8,22 @@ type Reminder = {
   dueDate: string; // YYYY-MM-DD (or empty)
   completed: boolean;
   createdAt: string;
+  assignedTo: string;
 };
 
 export default function RemindersPage() {
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState("");
-  const [profileId, setProfileId] = useState<string | null>(null);
-  const [profileLoaded, setProfileLoaded] = useState(false);
+  const [assignedTo, setAssignedTo] = useState("");
+
 
   // Load from localStorage
   useEffect(() => {
     try {
       if (typeof window === "undefined") return;
 
-      let currentProfileId: string | null = null;
-      const savedProfile = window.localStorage.getItem(
-        "lifeOS_currentProfile"
-      );
-      if (savedProfile) {
-        const parsed = JSON.parse(savedProfile) as { id?: string };
-        if (parsed.id) currentProfileId = parsed.id;
-      }
-      setProfileId(currentProfileId);
-
-      const key =
-        currentProfileId !== null
-          ? `lifeOS_reminders_${currentProfileId}`
-          : "lifeOS_reminders";
-
-      const saved = window.localStorage.getItem(key);
+      const saved = window.localStorage.getItem("lifeOS_reminders");
       if (saved) {
         const parsed: Reminder[] = JSON.parse(saved);
         parsed.sort((a, b) => (a.createdAt > b.createdAt ? 1 : -1));
@@ -45,27 +31,25 @@ export default function RemindersPage() {
       }
     } catch (err) {
       console.error("Failed to load reminders", err);
-    } finally {
-      setProfileLoaded(true);
     }
   }, []);
 
 
+
   // Save whenever reminders change
   useEffect(() => {
-    if (!profileLoaded) return;
     try {
       if (typeof window !== "undefined") {
-        const key =
-          profileId !== null
-            ? `lifeOS_reminders_${profileId}`
-            : "lifeOS_reminders";
-        window.localStorage.setItem(key, JSON.stringify(reminders));
+        window.localStorage.setItem(
+          "lifeOS_reminders",
+          JSON.stringify(reminders)
+        );
       }
     } catch (err) {
       console.error("Failed to save reminders", err);
     }
-  }, [reminders, profileId, profileLoaded]);
+  }, [reminders]);
+
 
 
   const addReminder = () => {
@@ -80,6 +64,8 @@ export default function RemindersPage() {
       dueDate,
       completed: false,
       createdAt: now,
+      assignedTo,
+
     };
     setReminders((prev) => [...prev, newReminder]);
     setTitle("");
@@ -175,6 +161,18 @@ export default function RemindersPage() {
             />
           </div>
           <div className="space-y-1">
+  <label className="block text-zinc-400">Assigned to</label>
+  <select
+    value={assignedTo}
+    onChange={(e) => setAssignedTo(e.target.value)}
+    className="w-full rounded bg-zinc-800 border border-zinc-700 px-2 py-1 text-zinc-100"
+  >
+    <option value="">Unassigned</option>
+    <option value="Will">Will</option>
+    <option value="Michelle">Michelle</option>
+  </select>
+</div>
+          <div className="space-y-1">
             <label className="block text-zinc-400">Due date (optional)</label>
             <input
               type="date"
@@ -245,6 +243,12 @@ export default function RemindersPage() {
                         </span>
                       </p>
                     )}
+                    {r.assignedTo && (
+  <p className="text-[11px] text-zinc-500 mt-0.5">
+    Assigned to: {r.assignedTo}
+  </p>
+)}
+
                   </div>
                 </label>
                 <button

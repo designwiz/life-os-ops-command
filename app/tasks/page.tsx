@@ -9,8 +9,10 @@ type Task = {
   title: string;
   notes: string;
   status: Status;
+  assignedTo: string;
   createdAt: string;
 };
+
 
 const STATUSES: Status[] = [
   "Inbox",
@@ -27,31 +29,16 @@ export default function TasksPage() {
   const [notes, setNotes] = useState("");
   const [status, setStatus] = useState<Status>("Inbox");
   const [statusFilter, setStatusFilter] = useState<Status | "All">("All");
-  const [profileId, setProfileId] = useState<string | null>(null);
-  const [profileLoaded, setProfileLoaded] = useState(false);
+  const [assignedTo, setAssignedTo] = useState("");
+  const [assignmentFilter, setAssignmentFilter] = useState("All");
+
 
   // Load tasks for the current profile
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     try {
-      // Determine profile
-      let currentProfileId: string | null = null;
-      const savedProfile = window.localStorage.getItem(
-        "lifeOS_currentProfile"
-      );
-      if (savedProfile) {
-        const parsed = JSON.parse(savedProfile) as { id?: string };
-        if (parsed.id) currentProfileId = parsed.id;
-      }
-      setProfileId(currentProfileId);
-
-      const key =
-        currentProfileId !== null
-          ? `lifeOS_tasks_${currentProfileId}`
-          : "lifeOS_tasks";
-
-      const savedTasks = window.localStorage.getItem(key);
+      const savedTasks = window.localStorage.getItem("lifeOS_tasks");
       if (savedTasks) {
         const parsed = JSON.parse(savedTasks) as Task[];
         parsed.sort((a, b) => (a.createdAt > b.createdAt ? 1 : -1));
@@ -61,26 +48,20 @@ export default function TasksPage() {
       }
     } catch (err) {
       console.error("Failed to load tasks", err);
-    } finally {
-      setProfileLoaded(true);
     }
   }, []);
 
+
   // Save whenever tasks change
   useEffect(() => {
-    if (!profileLoaded) return;
     if (typeof window === "undefined") return;
-
     try {
-      const key =
-        profileId !== null
-          ? `lifeOS_tasks_${profileId}`
-          : "lifeOS_tasks";
-      window.localStorage.setItem(key, JSON.stringify(tasks));
+      window.localStorage.setItem("lifeOS_tasks", JSON.stringify(tasks));
     } catch (err) {
       console.error("Failed to save tasks", err);
     }
-  }, [tasks, profileId, profileLoaded]);
+  }, [tasks]);
+
 
   const addTask = () => {
     if (!title.trim()) {
@@ -93,6 +74,7 @@ export default function TasksPage() {
       title: title.trim(),
       notes: notes.trim(),
       status,
+      assignedTo,
       createdAt: now,
     };
     setTasks((prev) => [...prev, newTask]);
@@ -112,10 +94,18 @@ export default function TasksPage() {
     setTasks((prev) => prev.filter((t) => t.id !== id));
   };
 
-  const filtered =
-    statusFilter === "All"
-      ? tasks
-      : tasks.filter((t) => t.status === statusFilter);
+let filtered = statusFilter === "All"
+  ? tasks
+  : tasks.filter((t) => t.status === statusFilter);
+
+if (assignmentFilter !== "All") {
+  filtered = filtered.filter((t) =>
+    assignmentFilter === "Unassigned"
+      ? !t.assignedTo
+      : t.assignedTo === assignmentFilter
+  );
+}
+
 
   const tasksByStatus: Record<Status, Task[]> = {
     Inbox: [],
@@ -176,6 +166,18 @@ export default function TasksPage() {
               ))}
             </select>
           </div>
+        <div className="space-y-1">
+         <label className="block text-zinc-400">Assigned to</label>
+         <select
+           value={assignedTo}
+           onChange={(e) => setAssignedTo(e.target.value)}
+           className="w-full rounded bg-zinc-800 border border-zinc-700 px-2 py-1 text-zinc-100"
+         >
+           <option value="">Unassigned</option>
+           <option value="Will">Will</option>
+           <option value="Michelle">Michelle</option>
+         </select>
+        </div>
           <div className="space-y-1">
             <label className="block text-zinc-400">Notes (optional)</label>
             <input
@@ -238,6 +240,22 @@ export default function TasksPage() {
           ))}
         </div>
       </section>
+<div className="flex gap-2 flex-wrap">
+  {["All", "Will", "Michelle", "Unassigned"].map((opt) => (
+    <button
+      key={opt}
+      onClick={() => setAssignmentFilter(opt)}
+      className={
+        "px-3 py-1 rounded-full border text-[11px] " +
+        (assignmentFilter === opt
+          ? "border-sky-500 text-sky-300 bg-sky-900/40"
+          : "border-zinc-700 text-zinc-300 bg-zinc-900")
+      }
+    >
+      {opt}
+    </button>
+  ))}
+</div>
 
       {/* Board */}
       <section className="grid gap-4 md:grid-cols-3 xl:grid-cols-6 text-xs">
@@ -263,6 +281,11 @@ export default function TasksPage() {
                       <p className="text-zinc-100 text-xs font-semibold">
                         {task.title}
                       </p>
+                      {task.assignedTo && (
+  <p className="text-[10px] text-zinc-500">
+    Assigned to: {task.assignedTo}
+  </p>
+)}
                       {task.notes && (
                         <p className="text-[11px] text-zinc-400">
                           {task.notes}

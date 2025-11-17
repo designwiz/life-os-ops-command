@@ -1,30 +1,19 @@
-import type { Metadata } from "next";
 import "./globals.css";
+import ThemeWrapper from "./ThemeWrapper";   // <-- required import
 
-export const metadata: Metadata = {
-  title: "Will's Ops Command",
-  description: "Life OS dashboard for Will – health, tasks, and orders.",
-  manifest: "/manifest.webmanifest",
-  themeColor: "#020617",
-  icons: {
-    icon: "/icons/icon-192.png",
-    apple: "/icons/icon-192.png"
-  },
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "Will's Ops Command"
-  }
+export const metadata = {
+  title: "Life OS",
+  description: "Ops Command for Will + Michelle",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="bg-zinc-950 text-zinc-100">{children}</body>
+      <body>
+        <ThemeWrapper>
+          {children}
+        </ThemeWrapper>
+      </body>
     </html>
   );
 }

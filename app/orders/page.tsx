@@ -83,55 +83,24 @@ export default function OrdersPage() {
   const [fulfilmentFilter, setFulfilmentFilter] =
     useState<FulfilmentFilter>("All");
   const [search, setSearch] = useState("");
-  const [profileId, setProfileId] = useState<string | null>(null);
-  const [profileLoaded, setProfileLoaded] = useState(false);
+
 
   // Load from localStorage
-  useEffect(() => {
+    useEffect(() => {
     try {
       if (typeof window === "undefined") return;
 
-      // Determine profile
-      let currentProfileId: string | null = null;
-      const savedProfile = window.localStorage.getItem(
-        "lifeOS_currentProfile"
-      );
-      if (savedProfile) {
-        const parsed = JSON.parse(savedProfile) as { id?: string };
-        if (parsed.id) currentProfileId = parsed.id;
-      }
-      setProfileId(currentProfileId);
-
-      const key =
-        currentProfileId !== null
-          ? `lifeOS_orders_${currentProfileId}`
-          : "lifeOS_orders";
-
-      const saved = window.localStorage.getItem(key);
+      const saved = window.localStorage.getItem("lifeOS_orders");
       if (saved) {
         const parsed = JSON.parse(saved) as Partial<Order>[];
-        const normalised: Order[] = parsed.map((o) => ({
-          id: o.id || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-          customerName: o.customerName || "",
-          item: o.item || "",
-          status: (o.status as OrderStatus) || "Enquiry",
-          channel: (o.channel as OrderChannel) || "Instagram",
-          price: o.price ?? "",
-          depositPaid: !!o.depositPaid,
-          dueDate: o.dueDate || "",
-          createdAt: o.createdAt || new Date().toISOString(),
-          notes: o.notes || "",
-          fulfilment: (o.fulfilment as Fulfilment) || "Collection",
-        }));
-        normalised.sort((a, b) => (a.createdAt > b.createdAt ? 1 : -1));
+        // ...normalise and sort...
         setOrders(normalised);
       }
     } catch (err) {
       console.error("Failed to load orders", err);
-    } finally {
-      setProfileLoaded(true);
     }
   }, []);
+
 
 
   // Load from localStorage
@@ -164,20 +133,16 @@ export default function OrdersPage() {
   }, []);
 
   // Save whenever orders change
-   useEffect(() => {
-    if (!profileLoaded) return;
+  useEffect(() => {
     try {
       if (typeof window !== "undefined") {
-        const key =
-          profileId !== null
-            ? `lifeOS_orders_${profileId}`
-            : "lifeOS_orders";
-        window.localStorage.setItem(key, JSON.stringify(orders));
+        window.localStorage.setItem("lifeOS_orders", JSON.stringify(orders));
       }
     } catch (err) {
       console.error("Failed to save orders", err);
     }
-  }, [orders, profileId, profileLoaded]);
+  }, [orders]);
+
 
   const addOrder = () => {
     if (!customerName.trim() || !item.trim()) {

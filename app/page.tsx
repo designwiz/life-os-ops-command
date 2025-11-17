@@ -31,44 +31,41 @@ export default function HomePage() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [todayTaskCount, setTodayTaskCount] = useState<number>(0);
   const [openOrdersCount, setOpenOrdersCount] = useState<number>(0);
-  const [activeRemindersCount, setActiveRemindersCount] = useState<number>(0);
+  const [activeRemindersCount, setActiveRemindersCount] =
+    useState<number>(0);
   const [profileName, setProfileName] = useState<string>("Guest");
-  const [profileId, setProfileId] = useState<string | null>(null);
 
+  // Michelle mode = change behaviour / visibility
+  const michelleMode =
+    profileName.trim().toLowerCase() === "michelle";
 
-  // Load "today", history, tasks count, orders count, reminders count
+  // Load "today", history, counts, and profile (all shared data)
   useEffect(() => {
     try {
       if (typeof window === "undefined") return;
 
-      // ---- Determine current profile ----
-      let currentProfileId: string | null = null;
-      let currentProfileName = "Guest";
-
+      // ---- Profile ----
       try {
         const savedProfile = window.localStorage.getItem(
           "lifeOS_currentProfile"
         );
         if (savedProfile) {
           const parsed = JSON.parse(savedProfile) as {
-            id?: string;
             name?: string;
           };
-          if (parsed.id) currentProfileId = parsed.id;
-          if (parsed.name) currentProfileName = parsed.name;
+          if (parsed.name) {
+            setProfileName(parsed.name);
+          } else {
+            setProfileName("Guest");
+          }
+        } else {
+          setProfileName("Guest");
         }
       } catch {
-        // ignore, keep Guest/default
+        setProfileName("Guest");
       }
 
-      setProfileId(currentProfileId);
-      setProfileName(currentProfileName);
-
-      // Helper to build per-profile keys, with fallback to old global keys
-      const keyFor = (base: string) =>
-        currentProfileId ? `${base}_${currentProfileId}` : base;
-
-      // ---- Today (still global for now) ----
+      // ---- Today (shared/global) ----
       const savedToday = window.localStorage.getItem("lifeOS_today");
       if (savedToday) {
         setToday(JSON.parse(savedToday));
@@ -78,41 +75,43 @@ export default function HomePage() {
         setToday((prev) => ({ ...prev, date: formatted }));
       }
 
-      // ---- History (still global for now) ----
-      const savedHistory = window.localStorage.getItem("lifeOS_history");
+      // ---- History (shared/global) ----
+      const savedHistory = window.localStorage.getItem(
+        "lifeOS_history"
+      );
       if (savedHistory) {
         const parsed: HistoryEntry[] = JSON.parse(savedHistory);
         parsed.sort((a, b) => (a.date > b.date ? 1 : -1)); // oldest → newest
         setHistory(parsed);
       }
 
-      // ---- Tasks – count "Today", per profile ----
-      const savedTasks = window.localStorage.getItem(
-        keyFor("lifeOS_tasks")
-      );
+      // ---- Tasks – use shared key ----
+      const savedTasks = window.localStorage.getItem("lifeOS_tasks");
       if (savedTasks) {
         const parsed = JSON.parse(savedTasks) as { status?: string }[];
-        const count = parsed.filter((t) => t.status === "Today").length;
+        const count = parsed.filter(
+          (t) => t.status === "Today"
+        ).length;
         setTodayTaskCount(count);
       } else {
         setTodayTaskCount(0);
       }
 
-      // ---- Orders – count non-completed, per profile ----
-      const savedOrders = window.localStorage.getItem(
-        keyFor("lifeOS_orders")
-      );
+      // ---- Orders – shared key ----
+      const savedOrders = window.localStorage.getItem("lifeOS_orders");
       if (savedOrders) {
         const parsed = JSON.parse(savedOrders) as { status?: string }[];
-        const open = parsed.filter((o) => o.status !== "Completed").length;
+        const open = parsed.filter(
+          (o) => o.status !== "Completed"
+        ).length;
         setOpenOrdersCount(open);
       } else {
         setOpenOrdersCount(0);
       }
 
-      // ---- Reminders – active count per profile ----
+      // ---- Reminders – shared key ----
       const savedReminders = window.localStorage.getItem(
-        keyFor("lifeOS_reminders")
+        "lifeOS_reminders"
       );
       if (savedReminders) {
         const parsed = JSON.parse(savedReminders) as {
@@ -128,24 +127,19 @@ export default function HomePage() {
     }
   }, []);
 
-  // Load current profile name
+  // Save "today" whenever it changes
   useEffect(() => {
-    if (typeof window === "undefined") return;
     try {
-      const saved = window.localStorage.getItem("lifeOS_currentProfile");
-      if (saved) {
-        const parsed = JSON.parse(saved) as { name?: string };
-        if (parsed.name) {
-          setProfileName(parsed.name);
-          return;
-        }
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(
+          "lifeOS_today",
+          JSON.stringify(today)
+        );
       }
-      // Fallback if no profile yet
-      setProfileName("Guest");
-    } catch {
-      setProfileName("Guest");
+    } catch (err) {
+      console.error("Failed to save today state", err);
     }
-  }, []);
+  }, [today]);
 
   // Register service worker for PWA
   useEffect(() => {
@@ -159,7 +153,10 @@ export default function HomePage() {
     }
   }, []);
 
-  const updateField = (field: keyof TodayState, value: string | boolean) => {
+  const updateField = (
+    field: keyof TodayState,
+    value: string | boolean
+  ) => {
     setToday((prev) => ({
       ...prev,
       [field]: value,
@@ -180,11 +177,18 @@ export default function HomePage() {
 
     try {
       const existing = window.localStorage.getItem("lifeOS_history");
-      const oldHistory: HistoryEntry[] = existing ? JSON.parse(existing) : [];
-      const filtered = oldHistory.filter((h) => h.date !== entry.date);
+      const oldHistory: HistoryEntry[] = existing
+        ? JSON.parse(existing)
+        : [];
+      const filtered = oldHistory.filter(
+        (h) => h.date !== entry.date
+      );
       filtered.push(entry);
       filtered.sort((a, b) => (a.date > b.date ? 1 : -1)); // oldest → newest
-      window.localStorage.setItem("lifeOS_history", JSON.stringify(filtered));
+      window.localStorage.setItem(
+        "lifeOS_history",
+        JSON.stringify(filtered)
+      );
       setHistory(filtered);
       alert("Saved today to history ✅");
     } catch (err) {
@@ -368,7 +372,9 @@ export default function HomePage() {
       days: last7.length,
       avgWeight: weightCount ? weightSum / weightCount : null,
       avgSleep: sleepCount ? sleepSum / sleepCount : null,
-      avgHydration: hydrationCount ? hydrationSum / hydrationCount : null,
+      avgHydration: hydrationCount
+        ? hydrationSum / hydrationCount
+        : null,
       smoothieDays,
       workoutDays,
     };
@@ -377,8 +383,8 @@ export default function HomePage() {
   // ---- RENDER ----
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 p-4 md:p-8">
-         <header className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div className="min-h-screen bg-transparent text-inherit p-4 md:p-8">
+      <header className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold">
             Will&apos;s Ops Command
@@ -399,14 +405,18 @@ export default function HomePage() {
               switch / manage profiles
             </a>
           </p>
+          {michelleMode && (
+            <p className="mt-1 text-[11px] text-pink-400">
+              Michelle mode: health stats hidden on this view 💕
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap gap-2 text-xs text-zinc-400 items-center">
-
           <span className="px-2 py-1 rounded-full bg-emerald-900/40 border border-emerald-600/60">
             STATUS: GREEN
           </span>
           <span className="px-2 py-1 rounded-full bg-zinc-900 border border-zinc-700">
-            Theme: Tactical / Dark Ops
+            Theme: Tactical / Shared Ops
           </span>
           <span
             className={
@@ -471,7 +481,7 @@ export default function HomePage() {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setToday(INITIAL_STATE)}
-            className="text-xs px-3 py-1 rounded-full border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 transition"
+            className="text-xs px-3 py-1 rounded-full border border-zinc-700 bg-zinc-900 hover	bg-zinc-800 transition"
           >
             Reset today
           </button>
@@ -484,136 +494,155 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Top grid: Vital stats + hydration + habits + streaks */}
-      <div className="grid gap-4 md:grid-cols-4">
-        {/* Vital Stats */}
-        <section className="md:col-span-2 rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
-          <h2 className="text-sm font-semibold text-zinc-300 mb-3">
-            Vital Stats
-          </h2>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div className="space-y-2">
-              <p className="text-zinc-400 text-xs">Weight (kg)</p>
-              <input
-                type="number"
-                inputMode="decimal"
-                value={today.weightKg}
-                onChange={(e) => updateField("weightKg", e.target.value)}
-                className="w-full rounded bg-zinc-800 border border-zinc-700 px-2 py-1 text-zinc-100"
-                placeholder="Enter weight"
-              />
-            </div>
-            <div className="space-y-2">
-              <p className="text-zinc-400 text-xs">Sleep (hours)</p>
-              <input
-                type="number"
-                inputMode="decimal"
-                value={today.sleepHours}
-                onChange={(e) => updateField("sleepHours", e.target.value)}
-                className="w-full rounded bg-zinc-800 border border-zinc-700 px-2 py-1 text-zinc-100"
-                placeholder="e.g. 7.0"
-              />
-              <p className="text-zinc-400 text-xs mt-1">Mood</p>
-              <select
-                value={today.mood}
-                onChange={(e) => updateField("mood", e.target.value)}
-                className="w-full rounded bg-zinc-800 border border-zinc-700 px-2 py-1 text-zinc-100 text-xs"
-              >
-                <option value="">Select mood</option>
-                <option value="Good">Good</option>
-                <option value="Okay">Okay</option>
-                <option value="Low">Low</option>
-                <option value="Stressed">Stressed</option>
-              </select>
-            </div>
-          </div>
-        </section>
-
-        {/* Hydration */}
-        <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
-          <h2 className="text-sm font-semibold text-zinc-300 mb-3">
-            Hydration
-          </h2>
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center gap-2">
-              <span className="text-zinc-400 text-xs">Litres today</span>
-              <input
-                type="number"
-                step="0.1"
-                inputMode="decimal"
-                value={today.hydrationLitres}
-                onChange={(e) =>
-                  updateField("hydrationLitres", e.target.value)
-                }
-                className="w-24 rounded bg-zinc-800 border border-zinc-700 px-2 py-1 text-zinc-100 text-xs"
-                placeholder="0.0"
-              />
-            </div>
-            <p className="text-xs text-zinc-400">
-              Target: 2.0 L • {hydrationPercent}% complete
-            </p>
-            <div className="h-2 w-full rounded-full bg-zinc-800 overflow-hidden">
-              <div
-                className="h-full bg-sky-500 transition-all"
-                style={{ width: `${hydrationPercent}%` }}
-              />
-            </div>
-          </div>
-        </section>
-
-        {/* Habits + Streaks */}
-        <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
-          <h2 className="text-sm font-semibold text-zinc-300 mb-3">
-            Core Habits & Streaks
-          </h2>
-          <div className="space-y-3 text-sm">
-            <div className="space-y-2">
-              <label className="flex items-center gap-2">
+      {/* Health / vitals – hidden in Michelle mode */}
+      {!michelleMode && (
+        <div className="grid gap-4 md:grid-cols-4">
+          {/* Vital Stats */}
+          <section className="md:col-span-2 rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
+            <h2 className="text-sm font-semibold text-zinc-300 mb-3">
+              Vital Stats
+            </h2>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="space-y-2">
+                <p className="text-zinc-400 text-xs">Weight (kg)</p>
                 <input
-                  type="checkbox"
-                  checked={today.smoothieDone}
+                  type="number"
+                  inputMode="decimal"
+                  value={today.weightKg}
                   onChange={(e) =>
-                    updateField("smoothieDone", e.target.checked)
+                    updateField("weightKg", e.target.value)
                   }
+                  className="w-full rounded bg-zinc-800 border border-zinc-700 px-2 py-1 text-zinc-100"
+                  placeholder="Enter weight"
                 />
-                <span>Smoothie done</span>
-              </label>
-              <p className="text-xs text-zinc-400">
-                Current streak:{" "}
-                <span className="text-emerald-400 font-semibold">
-                  {smoothieStreak}
-                </span>{" "}
-                day{smoothieStreak === 1 ? "" : "s"} • Best:{" "}
-                <span className="text-emerald-400 font-semibold">
-                  {bestSmoothieStreak}
-                </span>
-              </p>
-            </div>
-            <div className="space-y-2">
-              <label className="flex items-center gap-2">
+              </div>
+              <div className="space-y-2">
+                <p className="text-zinc-400 text-xs">Sleep (hours)</p>
                 <input
-                  type="checkbox"
-                  checked={today.workoutDone}
+                  type="number"
+                  inputMode="decimal"
+                  value={today.sleepHours}
                   onChange={(e) =>
-                    updateField("workoutDone", e.target.checked)
+                    updateField("sleepHours", e.target.value)
                   }
+                  className="w-full rounded bg-zinc-800 border border-zinc-700 px-2 py-1 text-zinc-100"
+                  placeholder="e.g. 7.0"
                 />
-                <span>Workout / treadmill</span>
-              </label>
-              <p className="text-xs text-zinc-400">
-                Current streak:{" "}
-                <span className="text-emerald-400 font-semibold">
-                  {workoutStreak}
-                </span>{" "}
-                day{workoutStreak === 1 ? "" : "s"} • Best:{" "}
-                <span className="text-emerald-400 font-semibold">
-                  {bestWorkoutStreak}
-                </span>
-              </p>
+                <p className="text-zinc-400 text-xs mt-1">Mood</p>
+                <select
+                  value={today.mood}
+                  onChange={(e) =>
+                    updateField("mood", e.target.value)
+                  }
+                  className="w-full rounded bg-zinc-800 border border-zinc-700 px-2 py-1 text-zinc-100 text-xs"
+                >
+                  <option value="">Select mood</option>
+                  <option value="Good">Good</option>
+                  <option value="Okay">Okay</option>
+                  <option value="Low">Low</option>
+                  <option value="Stressed">Stressed</option>
+                </select>
+              </div>
             </div>
-          </div>
-        </section>
-      </div>
+          </section>
+
+          {/* Hydration */}
+          <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
+            <h2 className="text-sm font-semibold text-zinc-300 mb-3">
+              Hydration
+            </h2>
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-zinc-400 text-xs">
+                  Litres today
+                </span>
+                <input
+                  type="number"
+                  step="0.1"
+                  inputMode="decimal"
+                  value={today.hydrationLitres}
+                  onChange={(e) =>
+                    updateField(
+                      "hydrationLitres",
+                      e.target.value
+                    )
+                  }
+                  className="w-24 rounded bg-zinc-800 border border-zinc-700 px-2 py-1 text-zinc-100 text-xs"
+                  placeholder="0.0"
+                />
+              </div>
+              <p className="text-xs text-zinc-400">
+                Target: 2.0 L • {hydrationPercent}% complete
+              </p>
+              <div className="h-2 w-full rounded-full bg-zinc-800 overflow-hidden">
+                <div
+                  className="h-full bg-sky-500 transition-all"
+                  style={{ width: `${hydrationPercent}%` }}
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* Habits + Streaks */}
+          <section className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
+            <h2 className="text-sm font-semibold text-zinc-300 mb-3">
+              Core Habits & Streaks
+            </h2>
+            <div className="space-y-3 text-sm">
+              <div className="space-y-2">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={today.smoothieDone}
+                    onChange={(e) =>
+                      updateField(
+                        "smoothieDone",
+                        e.target.checked
+                      )
+                    }
+                  />
+                  <span>Smoothie done</span>
+                </label>
+                <p className="text-xs text-zinc-400">
+                  Current streak:{" "}
+                  <span className="text-emerald-400 font-semibold">
+                    {smoothieStreak}
+                  </span>{" "}
+                  day{smoothieStreak === 1 ? "" : "s"} • Best:{" "}
+                  <span className="text-emerald-400 font-semibold">
+                    {bestSmoothieStreak}
+                  </span>
+                </p>
+              </div>
+              <div className="space-y-2">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={today.workoutDone}
+                    onChange={(e) =>
+                      updateField(
+                        "workoutDone",
+                        e.target.checked
+                      )
+                    }
+                  />
+                  <span>Workout / treadmill</span>
+                </label>
+                <p className="text-xs text-zinc-400">
+                  Current streak:{" "}
+                  <span className="text-emerald-400 font-semibold">
+                    {workoutStreak}
+                  </span>{" "}
+                  day{workoutStreak === 1 ? "" : "s"} • Best:{" "}
+                  <span className="text-emerald-400 font-semibold">
+                    {bestWorkoutStreak}
+                  </span>
+                </p>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
 
       {/* Weekly summary + Today’s Ops */}
       <div className="mt-6 grid gap-4 md:grid-cols-3">
@@ -637,7 +666,9 @@ export default function HomePage() {
                 Avg weight:{" "}
                 <span className="text-zinc-100 font-semibold">
                   {weeklySummary.avgWeight
-                    ? `${weeklySummary.avgWeight.toFixed(1)} kg`
+                    ? `${weeklySummary.avgWeight.toFixed(
+                        1
+                      )} kg`
                     : "—"}
                 </span>
               </p>
@@ -645,7 +676,9 @@ export default function HomePage() {
                 Avg sleep:{" "}
                 <span className="text-zinc-100 font-semibold">
                   {weeklySummary.avgSleep
-                    ? `${weeklySummary.avgSleep.toFixed(1)} hrs`
+                    ? `${weeklySummary.avgSleep.toFixed(
+                        1
+                      )} hrs`
                     : "—"}
                 </span>
               </p>
@@ -653,7 +686,9 @@ export default function HomePage() {
                 Avg hydration:{" "}
                 <span className="text-zinc-100 font-semibold">
                   {weeklySummary.avgHydration
-                    ? `${weeklySummary.avgHydration.toFixed(1)} L`
+                    ? `${weeklySummary.avgHydration.toFixed(
+                        1
+                      )} L`
                     : "—"}
                 </span>
               </p>
@@ -711,7 +746,9 @@ export default function HomePage() {
             <h2 className="text-sm font-semibold text-zinc-300 mb-2">
               Message of the Day
             </h2>
-            <p className="text-sm text-zinc-100 leading-relaxed">“{quote}”</p>
+            <p className="text-sm text-zinc-100 leading-relaxed">
+              “{quote}”
+            </p>
           </div>
           <p className="mt-3 text-[11px] text-zinc-500">
             Mission: show up for Future You.
