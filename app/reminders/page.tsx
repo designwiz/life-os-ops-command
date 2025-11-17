@@ -14,12 +14,30 @@ export default function RemindersPage() {
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [profileId, setProfileId] = useState<string | null>(null);
+  const [profileLoaded, setProfileLoaded] = useState(false);
 
   // Load from localStorage
   useEffect(() => {
     try {
       if (typeof window === "undefined") return;
-      const saved = window.localStorage.getItem("lifeOS_reminders");
+
+      let currentProfileId: string | null = null;
+      const savedProfile = window.localStorage.getItem(
+        "lifeOS_currentProfile"
+      );
+      if (savedProfile) {
+        const parsed = JSON.parse(savedProfile) as { id?: string };
+        if (parsed.id) currentProfileId = parsed.id;
+      }
+      setProfileId(currentProfileId);
+
+      const key =
+        currentProfileId !== null
+          ? `lifeOS_reminders_${currentProfileId}`
+          : "lifeOS_reminders";
+
+      const saved = window.localStorage.getItem(key);
       if (saved) {
         const parsed: Reminder[] = JSON.parse(saved);
         parsed.sort((a, b) => (a.createdAt > b.createdAt ? 1 : -1));
@@ -27,22 +45,28 @@ export default function RemindersPage() {
       }
     } catch (err) {
       console.error("Failed to load reminders", err);
+    } finally {
+      setProfileLoaded(true);
     }
   }, []);
 
+
   // Save whenever reminders change
   useEffect(() => {
+    if (!profileLoaded) return;
     try {
       if (typeof window !== "undefined") {
-        window.localStorage.setItem(
-          "lifeOS_reminders",
-          JSON.stringify(reminders)
-        );
+        const key =
+          profileId !== null
+            ? `lifeOS_reminders_${profileId}`
+            : "lifeOS_reminders";
+        window.localStorage.setItem(key, JSON.stringify(reminders));
       }
     } catch (err) {
       console.error("Failed to save reminders", err);
     }
-  }, [reminders]);
+  }, [reminders, profileId, profileLoaded]);
+
 
   const addReminder = () => {
     if (!title.trim()) {

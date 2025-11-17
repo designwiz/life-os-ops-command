@@ -32,7 +32,8 @@ export default function HomePage() {
   const [todayTaskCount, setTodayTaskCount] = useState<number>(0);
   const [openOrdersCount, setOpenOrdersCount] = useState<number>(0);
   const [activeRemindersCount, setActiveRemindersCount] = useState<number>(0);
-  const [profileName, setProfileName] = useState<string>("");
+  const [profileName, setProfileName] = useState<string>("Guest");
+  const [profileId, setProfileId] = useState<string | null>(null);
 
 
   // Load "today", history, tasks count, orders count, reminders count
@@ -40,7 +41,34 @@ export default function HomePage() {
     try {
       if (typeof window === "undefined") return;
 
-      // Today
+      // ---- Determine current profile ----
+      let currentProfileId: string | null = null;
+      let currentProfileName = "Guest";
+
+      try {
+        const savedProfile = window.localStorage.getItem(
+          "lifeOS_currentProfile"
+        );
+        if (savedProfile) {
+          const parsed = JSON.parse(savedProfile) as {
+            id?: string;
+            name?: string;
+          };
+          if (parsed.id) currentProfileId = parsed.id;
+          if (parsed.name) currentProfileName = parsed.name;
+        }
+      } catch {
+        // ignore, keep Guest/default
+      }
+
+      setProfileId(currentProfileId);
+      setProfileName(currentProfileName);
+
+      // Helper to build per-profile keys, with fallback to old global keys
+      const keyFor = (base: string) =>
+        currentProfileId ? `${base}_${currentProfileId}` : base;
+
+      // ---- Today (still global for now) ----
       const savedToday = window.localStorage.getItem("lifeOS_today");
       if (savedToday) {
         setToday(JSON.parse(savedToday));
@@ -50,7 +78,7 @@ export default function HomePage() {
         setToday((prev) => ({ ...prev, date: formatted }));
       }
 
-      // History
+      // ---- History (still global for now) ----
       const savedHistory = window.localStorage.getItem("lifeOS_history");
       if (savedHistory) {
         const parsed: HistoryEntry[] = JSON.parse(savedHistory);
@@ -58,46 +86,47 @@ export default function HomePage() {
         setHistory(parsed);
       }
 
-      // Tasks – count "Today"
-      const savedTasks = window.localStorage.getItem("lifeOS_tasks");
+      // ---- Tasks – count "Today", per profile ----
+      const savedTasks = window.localStorage.getItem(
+        keyFor("lifeOS_tasks")
+      );
       if (savedTasks) {
         const parsed = JSON.parse(savedTasks) as { status?: string }[];
         const count = parsed.filter((t) => t.status === "Today").length;
         setTodayTaskCount(count);
+      } else {
+        setTodayTaskCount(0);
       }
 
-      // Orders – count non-completed
-      const savedOrders = window.localStorage.getItem("lifeOS_orders");
+      // ---- Orders – count non-completed, per profile ----
+      const savedOrders = window.localStorage.getItem(
+        keyFor("lifeOS_orders")
+      );
       if (savedOrders) {
         const parsed = JSON.parse(savedOrders) as { status?: string }[];
         const open = parsed.filter((o) => o.status !== "Completed").length;
         setOpenOrdersCount(open);
+      } else {
+        setOpenOrdersCount(0);
       }
 
-      // Reminders – count active (not completed)
-      const savedReminders = window.localStorage.getItem("lifeOS_reminders");
+      // ---- Reminders – active count per profile ----
+      const savedReminders = window.localStorage.getItem(
+        keyFor("lifeOS_reminders")
+      );
       if (savedReminders) {
         const parsed = JSON.parse(savedReminders) as {
           completed?: boolean;
         }[];
         const active = parsed.filter((r) => !r.completed).length;
         setActiveRemindersCount(active);
+      } else {
+        setActiveRemindersCount(0);
       }
     } catch (err) {
       console.error("Failed to load saved state", err);
     }
   }, []);
-
-  // Save "today" whenever it changes
-  useEffect(() => {
-    try {
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem("lifeOS_today", JSON.stringify(today));
-      }
-    } catch (err) {
-      console.error("Failed to save today state", err);
-    }
-  }, [today]);
 
   // Load current profile name
   useEffect(() => {
