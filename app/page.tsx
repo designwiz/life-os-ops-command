@@ -383,7 +383,7 @@ export default function HomePage() {
   // ---- RENDER ----
 
   return (
-    <div className="min-h-screen bg-transparent text-inherit p-4 md:p-8">
+    <div className="min-h-screen p-4 md:p-8">
       <header className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold">

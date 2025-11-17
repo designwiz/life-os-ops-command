@@ -1,18 +1,20 @@
 import "./globals.css";
-import ThemeWrapper from "./ThemeWrapper";   // <-- required import
+import type { Metadata } from "next";
 
-export const metadata = {
-  title: "Life OS",
-  description: "Ops Command for Will + Michelle",
+export const metadata: Metadata = {
+  title: "Life OS – Will's Ops Command",
+  description: "Shared life dashboard for Will & Michelle",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en">
-      <body>
-        <ThemeWrapper>
-          {children}
-        </ThemeWrapper>
+      <body className="bg-zinc-950 text-zinc-100 min-h-screen">
+        {children}
       </body>
     </html>
   );
